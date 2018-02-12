@@ -34,6 +34,7 @@ public final class ConsumerRecord<K, V> {
     private final int serializedValueSize;
     private final K key;
     private final V value;
+    private long lastOffset;
 
     /**
      * Creates a record to be received from a specified topic and partition (provided for
@@ -92,6 +93,11 @@ public final class ConsumerRecord<K, V> {
         this.serializedValueSize = serializedValueSize;
         this.key = key;
         this.value = value;
+    }
+
+    public void setLastOffset(long offset) {
+
+        this.lastOffset = offset;
     }
 
     /**
@@ -173,5 +179,10 @@ public final class ConsumerRecord<K, V> {
                + ", serialized key size = "  + serializedKeySize
                + ", serialized value size = " + serializedValueSize
                + ", key = " + key + ", value = " + value + ")";
+    }
+
+    public long lastOffset()
+    {
+       return lastOffset;
     }
 }

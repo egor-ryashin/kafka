@@ -379,7 +379,12 @@ public class Fetcher<K, V> {
             } else if (partitionRecords.fetchOffset == position) {
                 // we are ensured to have at least one record since we already checked for emptiness
                 List<ConsumerRecord<K, V>> partRecords = partitionRecords.take(maxRecords);
-                long nextOffset = partRecords.get(partRecords.size() - 1).offset() + 1;
+                long nextOffset;
+                if (batch) {
+                    nextOffset = partRecords.get(partRecords.size() - 1).lastOffset() + 1;
+                } else {
+                    nextOffset = partRecords.get(partRecords.size() - 1).offset() + 1;
+                }
 
                 log.trace("Returning fetched records at offset {} for assigned partition {} and update " +
                         "position to {}", position, partitionRecords.partition, nextOffset);
@@ -602,6 +607,7 @@ public class Fetcher<K, V> {
         return parsedRecords;
     }
 
+    private static boolean batch = Boolean.getBoolean("batch");
     /**
      * Parse the record entry, deserializing the key / value fields if necessary
      */
@@ -616,21 +622,45 @@ public class Fetcher<K, V> {
                     + ")");
 
         try {
-            long offset = logEntry.offset();
-            long timestamp = record.timestamp();
-            TimestampType timestampType = record.timestampType();
-            ByteBuffer keyBytes = record.key();
-            byte[] keyByteArray = keyBytes == null ? null : Utils.toArray(keyBytes);
-            K key = keyBytes == null ? null : this.keyDeserializer.deserialize(partition.topic(), keyByteArray);
-            ByteBuffer valueBytes = record.value();
-            byte[] valueByteArray = valueBytes == null ? null : Utils.toArray(valueBytes);
-            V value = valueBytes == null ? null : this.valueDeserializer.deserialize(partition.topic(), valueByteArray);
+            if (batch ) {
+                long offset = logEntry.offset();
+                long timestamp = record.timestamp();
+                ByteBuffer buffer = ((MemoryRecords.RecordsIterator.BatchLogEntry) logEntry).getBuffer();
+                ConsumerRecord<K, V> kvConsumerRecord = new ConsumerRecord<>(partition.topic(),
+                                                                             partition.partition(),
+                                                                             offset,
+                                                                             timestamp,
+                                                                             null,
+                                                                             record.checksum(),
+                                                                             -1,
+                                                                             -1,
+                                                                             null,
+                                                                            null
+                );
+                MemoryRecords.RecordsIterator.BatchLogEntry logEntry1 = (MemoryRecords.RecordsIterator.BatchLogEntry) logEntry;
+                kvConsumerRecord.setLastOffset(logEntry1.lastOffset());
+                return kvConsumerRecord;
+            } else {
+                long offset = logEntry.offset();
+                long timestamp = record.timestamp();
+                TimestampType timestampType = record.timestampType();
+                ByteBuffer keyBytes = record.key();
+                byte[] keyByteArray = keyBytes == null ? null : Utils.toArray(keyBytes);
+                K key = keyBytes == null ? null : this.keyDeserializer.deserialize(partition.topic(), keyByteArray);
+                ByteBuffer valueBytes = record.value();
+                byte[] valueByteArray = valueBytes == null ? null : Utils.toArray(valueBytes);
+                V value = valueBytes == null
+                          ? null
+                          : this.valueDeserializer.deserialize(partition.topic(), valueByteArray);
 
-            return new ConsumerRecord<>(partition.topic(), partition.partition(), offset,
-                                        timestamp, timestampType, record.checksum(),
-                                        keyByteArray == null ? ConsumerRecord.NULL_SIZE : keyByteArray.length,
-                                        valueByteArray == null ? ConsumerRecord.NULL_SIZE : valueByteArray.length,
-                                        key, value);
+
+                return new ConsumerRecord<>(partition.topic(), partition.partition(), offset,
+                                            timestamp, timestampType, record.checksum(),
+                                            keyByteArray == null ? ConsumerRecord.NULL_SIZE : keyByteArray.length,
+                                            valueByteArray == null ? ConsumerRecord.NULL_SIZE : valueByteArray.length,
+                                            key, value
+                );
+            }
         } catch (RuntimeException e) {
             throw new SerializationException("Error deserializing key/value for partition " + partition +
                     " at offset " + logEntry.offset(), e);

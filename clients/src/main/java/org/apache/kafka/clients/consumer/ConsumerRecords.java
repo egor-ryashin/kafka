@@ -81,11 +81,30 @@ public class ConsumerRecords<K, V> implements Iterable<ConsumerRecord<K, V>> {
     /**
      * The number of records for all topics
      */
+    private static boolean batch = Boolean.getBoolean("batch");
     public int count() {
         int count = 0;
-        for (List<ConsumerRecord<K, V>> recs: this.records.values())
-            count += recs.size();
+        for (List<ConsumerRecord<K, V>> recs: this.records.values()) {
+            if (batch) {
+                if (!recs.isEmpty()) {
+                    ConsumerRecord<K, V> next = recs.iterator().next();
+                    count += next.lastOffset() - next.offset();
+                }
+            } else {
+                count += recs.size();
+            }
+        }
         return count;
+    }
+
+    public long lastOffset()
+    {
+        if (records.size() > 0) {
+            List<ConsumerRecord<K, V>> next = records.values().iterator().next();
+            if (next.size() > 0)
+              return next.get(next.size() - 1).lastOffset();
+        }
+        return -1;
     }
 
     private static class ConcatenatedIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {

@@ -19,7 +19,7 @@ package org.apache.kafka.common.record;
 /**
  * An offset and record pair
  */
-public final class LogEntry {
+public class LogEntry {
 
     private final long offset;
     private final Record record;

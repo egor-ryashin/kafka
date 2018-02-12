@@ -230,7 +230,10 @@ subprojects {
   }
 
   tasks.withType(ScalaCompile) {
-    scalaCompileOptions.useAnt = false
+    ScalaCompileOptions.metaClass.daemonServer = true
+    ScalaCompileOptions.metaClass.fork = true
+    ScalaCompileOptions.metaClass.useAnt = false
+    ScalaCompileOptions.metaClass.useCompileDaemon = false
 
     scalaCompileOptions.additionalParameters = [
       "-deprecation",

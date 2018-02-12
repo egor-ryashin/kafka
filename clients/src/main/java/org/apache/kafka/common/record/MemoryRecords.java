@@ -228,6 +228,7 @@ public class MemoryRecords implements Records {
         // The variables for inner iterator
         private final ArrayDeque<LogEntry> logEntries;
         private final long absoluteBaseOffset;
+        private BatchLogEntry batchLogEntry;
 
         public RecordsIterator(ByteBuffer buffer, boolean shallow) {
             this.type = CompressionType.NONE;
@@ -252,7 +253,7 @@ public class MemoryRecords implements Records {
                 long wrapperRecordTimestamp = entry.record().timestamp();
                 while (true) {
                     try {
-                        LogEntry logEntry = getNextEntryFromStream();
+                        LogEntry logEntry = getNextEntryFromStream(); // todo
                         Record recordWithTimestamp = new Record(logEntry.record().buffer(),
                                                                 wrapperRecordTimestamp,
                                                                 entry.record().timestampType());
@@ -288,7 +289,7 @@ public class MemoryRecords implements Records {
                         return allDone();
 
                     // Convert offset to absolute offset if needed.
-                    if (absoluteBaseOffset >= 0) {
+                    if (absoluteBaseOffset >= 0) { // for compressed
                         long absoluteOffset = absoluteBaseOffset + entry.offset();
                         entry = new LogEntry(absoluteOffset, entry.record());
                     }
@@ -328,29 +329,73 @@ public class MemoryRecords implements Records {
             return logEntries.isEmpty() ? null : logEntries.remove();
         }
 
-        private LogEntry getNextEntryFromStream() throws IOException {
-            // read the offset
-            long offset = stream.readLong();
-            // read record size
-            int size = stream.readInt();
-            if (size < 0)
-                throw new IllegalStateException("Record with size " + size);
-            // read the record, if compression is used we cannot depend on size
-            // and hence has to do extra copy
-            ByteBuffer rec;
-            if (type == CompressionType.NONE) {
-                rec = buffer.slice();
-                int newPos = buffer.position() + size;
-                if (newPos > buffer.limit())
-                    return null;
-                buffer.position(newPos);
-                rec.limit(size);
-            } else {
-                byte[] recordBuffer = new byte[size];
-                stream.readFully(recordBuffer, 0, size);
-                rec = ByteBuffer.wrap(recordBuffer);
+        private static boolean batch = Boolean.getBoolean("batch");
+
+        public static class BatchLogEntry extends LogEntry {
+
+            private final ByteBuffer buffer;
+            private final long lastOffset;
+
+            public BatchLogEntry(ByteBuffer buffer, long firstOffset, long lastOffset)
+            {
+                super(firstOffset, new Record(0, null, null,CompressionType.NONE,  0, 0));
+                this.buffer = buffer;
+                this.lastOffset = lastOffset;
             }
-            return new LogEntry(offset, new Record(rec));
+
+            public long lastOffset()
+            {
+                return lastOffset;
+            }
+
+            public ByteBuffer getBuffer()
+            {
+                return buffer;
+            }
+        }
+        private LogEntry getNextEntryFromStream() throws IOException {
+          if (batch) {
+            if (batchLogEntry == null) {
+                int size = 0;
+                long lastOffset = -1;
+                long firstOffset = -1;
+                do {
+                    stream.skipBytes(size);
+                    lastOffset = stream.readLong();
+                    if (firstOffset == -1)
+                        firstOffset = lastOffset;
+                    // read record size
+                    size = stream.readInt();
+                } while (buffer.position() + size < buffer.limit());
+
+                return batchLogEntry = new BatchLogEntry(buffer, firstOffset, lastOffset);
+            }
+            else
+              return null;
+          } else {
+              // read the offset
+              long offset = stream.readLong();
+              // read record size
+              int size = stream.readInt();
+              if (size < 0)
+                  throw new IllegalStateException("Record with size " + size);
+              // read the record, if compression is used we cannot depend on size
+              // and hence has to do extra copy
+              ByteBuffer rec;
+              if (type == CompressionType.NONE) {
+                  rec = buffer.slice();
+                  int newPos = buffer.position() + size;
+                  if (newPos > buffer.limit())
+                      return null;
+                  buffer.position(newPos);
+                  rec.limit(size);
+              } else {
+                  byte[] recordBuffer = new byte[size];
+                  stream.readFully(recordBuffer, 0, size);
+                  rec = ByteBuffer.wrap(recordBuffer);
+              }
+              return new LogEntry(offset, new Record(rec));
+          }
         }
 
         private boolean innerDone() {

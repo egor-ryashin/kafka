@@ -42,9 +42,9 @@ public class SimpleConsumerDemo {
     }
 
     private static void generateData() {
-        Producer producer2 = new Producer(KafkaProperties.TOPIC2, false);
+        Producer producer2 = new Producer(KafkaProperties.TOPIC2, false, 0);
         producer2.start();
-        Producer producer3 = new Producer(KafkaProperties.TOPIC3, false);
+        Producer producer3 = new Producer(KafkaProperties.TOPIC3, false, 0);
         producer3.start();
         try {
             Thread.sleep(1000);

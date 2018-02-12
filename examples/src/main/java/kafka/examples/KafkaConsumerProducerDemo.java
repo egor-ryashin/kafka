@@ -17,13 +17,30 @@
 package kafka.examples;
 
 public class KafkaConsumerProducerDemo {
-    public static void main(String[] args) {
-        boolean isAsync = args.length == 0 || !args[0].trim().equalsIgnoreCase("sync");
-        Producer producerThread = new Producer(KafkaProperties.TOPIC, isAsync);
+    public static void main(String[] args) throws InterruptedException
+    {
+      String topic = args[1];
+      int size = Integer.parseInt(args[2]);
+      if (args[0].equals("consume")) {
+        while (true) {
+          Consumer consumerThread = new Consumer(topic, size);
+          consumerThread.start();
+          int last = consumerThread.status;
+          while (true) {
+            Thread.sleep(5000);
+            if (last == consumerThread.status) {
+              consumerThread.shutdown();
+              break;
+            } else {
+              last = consumerThread.status;
+            }
+          }
+        }
+      } else {
+//        boolean isAsync = args.length == 0 || !args[0].trim().equalsIgnoreCase("sync");
+        Producer producerThread = new Producer(topic, true, size);
         producerThread.start();
-
-        Consumer consumerThread = new Consumer(KafkaProperties.TOPIC);
-        consumerThread.start();
+      }
 
     }
 }
