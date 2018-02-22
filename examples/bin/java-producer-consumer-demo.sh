@@ -15,11 +15,11 @@
 # limitations under the License.
 
 base_dir=$(dirname $0)/../..
+export JMX_PORT=7001
 
 if [ "x$KAFKA_HEAP_OPTS" = "x" ]; then
     export KAFKA_HEAP_OPTS="-Xmx512M"
 fi
 export KAFKA_HEAP_OPTS="-Xmx5G -Xms5G"
 export KAFKA_OPTS="-Dbatch=true"
-# -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"
 exec $base_dir/bin/kafka-run-class.sh kafka.examples.KafkaConsumerProducerDemo $@

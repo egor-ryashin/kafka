@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ScatteringByteChannel;
-import java.util.concurrent.ArrayBlockingQueue;
 
 /**
  * A size delimited Receive that consists of a 4 byte network-ordered size N followed by N bytes of content
@@ -31,14 +30,6 @@ public class NetworkReceive implements Receive {
     private final ByteBuffer size;
     private final int maxSize;
     private ByteBuffer buffer;
-    private static ThreadLocal<ByteBuffer> byteBuffers = new ThreadLocal<ByteBuffer>() {
-        @Override
-        protected ByteBuffer initialValue()
-        {
-            return ByteBuffer.allocate(2_000_000_000);
-        }
-    };
-
 
     public NetworkReceive(String source, ByteBuffer buffer) {
         this.source = source;
@@ -98,7 +89,7 @@ public class NetworkReceive implements Receive {
                 if (maxSize != UNLIMITED && receiveSize > maxSize)
                     throw new InvalidReceiveException("Invalid receive (size = " + receiveSize + " larger than " + maxSize + ")");
 
-                this.buffer = getAllocate(receiveSize);
+                this.buffer = ByteBuffer.allocate(receiveSize);
             }
         }
         if (buffer != null) {
@@ -109,18 +100,6 @@ public class NetworkReceive implements Receive {
         }
 
         return read;
-    }
-
-
-    private ByteBuffer getAllocate(int receiveSize)
-    {
-//        ByteBuffer byteBuffer = byteBuffers.get();
-//        if (byteBuffer.capacity() < receiveSize) {
-//            byteBuffers.set(byteBuffer = byteBuffer.allocate(receiveSize));
-//        }
-//
-//        return byteBuffer;
-        return ByteBuffer.allocateDirect(receiveSize);
     }
 
     public ByteBuffer payload() {

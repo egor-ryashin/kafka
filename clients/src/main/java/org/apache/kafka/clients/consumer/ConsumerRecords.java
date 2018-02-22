@@ -82,13 +82,13 @@ public class ConsumerRecords<K, V> implements Iterable<ConsumerRecord<K, V>> {
      * The number of records for all topics
      */
     private static boolean batch = Boolean.getBoolean("batch");
-    public int count() {
-        int count = 0;
+    public long count() {
+        long count = 0;
         for (List<ConsumerRecord<K, V>> recs: this.records.values()) {
             if (batch) {
                 if (!recs.isEmpty()) {
                     ConsumerRecord<K, V> next = recs.iterator().next();
-                    count += next.lastOffset() - next.offset();
+                    count += next.lastOffset() - next.offset() + 1;
                 }
             } else {
                 count += recs.size();

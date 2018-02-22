@@ -16,31 +16,61 @@
  */
 package kafka.examples;
 
+import java.util.ArrayList;
+
 public class KafkaConsumerProducerDemo {
     public static void main(String[] args) throws InterruptedException
     {
       String topic = args[1];
       int size = Integer.parseInt(args[2]);
-      if (args[0].equals("consume")) {
+      int count = Integer.parseInt(args[3]);
+      int minbytes = Integer.parseInt(args[4]);
+      int port = Integer.parseInt(args[5]);
+      String mode = args[0];
+      if (mode.equals("consume")) {
         while (true) {
-          Consumer consumerThread = new Consumer(topic, size);
+          Consumer consumerThread = new Consumer(topic, size, count, minbytes, port);
           consumerThread.start();
-          int last = consumerThread.status;
-          while (true) {
-            Thread.sleep(5000);
-            if (last == consumerThread.status) {
-              consumerThread.shutdown();
-              break;
-            } else {
-              last = consumerThread.status;
+          consumerThread.awaitShutdown();
+        }
+      } else if (mode.equals("produce")) {
+        Producer producerThread = new Producer(topic, true, size, count, minbytes, port);
+        producerThread.start();
+      } else if (mode.equals("multiread")) {
+        int partitions = Integer.parseInt(args[6]);
+        while (true) {
+          ArrayList<GroupConsumer> consumers = new ArrayList<>();
+          long l = System.currentTimeMillis();
+          for (int i = 0; i < partitions; i++) {
+            GroupConsumer consumerThread = new GroupConsumer(topic, size, count, minbytes, port, l, i);
+            consumers.add(consumerThread);
+          }
+          long start = System.currentTimeMillis();
+          for (GroupConsumer c : consumers) {
+            c.start();
+          }
+          long sum ;
+          long duration;
+          long previousSum = 0;
+          long previousMoment = start;
+          do {
+            Thread.sleep(1000);
+            sum = 0;
+            for (GroupConsumer c : consumers) {
+              sum += c.getRecordsTotal();
+            }
+            long l1 = System.currentTimeMillis();
+            duration = l1 - previousMoment;
+            System.out.println(String.format("time %d rs %d rs/s %.0f", duration, sum,  (sum - previousSum)/(duration/1000.0)));
+            previousSum = sum;
+            previousMoment = l1;
+          } while (sum < count);
+          {
+            for (GroupConsumer c : consumers) {
+              c.shutdown();
             }
           }
         }
-      } else {
-//        boolean isAsync = args.length == 0 || !args[0].trim().equalsIgnoreCase("sync");
-        Producer producerThread = new Producer(topic, true, size);
-        producerThread.start();
       }
-
     }
 }

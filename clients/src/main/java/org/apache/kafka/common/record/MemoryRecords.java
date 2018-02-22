@@ -3,9 +3,9 @@
  * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
  * to You under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
  * License. You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
@@ -193,7 +193,7 @@ public class MemoryRecords implements Records {
             return new RecordsIterator(this.buffer.duplicate(), false);
         }
     }
-    
+
     @Override
     public String toString() {
         Iterator<LogEntry> iter = iterator();
@@ -274,7 +274,7 @@ public class MemoryRecords implements Records {
 
         /*
          * Read the next record from the buffer.
-         * 
+         *
          * Note that in the compressed message set, each message value size is set as the size of the un-compressed
          * version of the message value, so when we do de-compression allocating an array of the specified size for
          * reading compressed value data is sufficient.
@@ -353,49 +353,71 @@ public class MemoryRecords implements Records {
                 return buffer;
             }
         }
-        private LogEntry getNextEntryFromStream() throws IOException {
-          if (batch) {
-            if (batchLogEntry == null) {
-                int size = 0;
-                long lastOffset = -1;
-                long firstOffset = -1;
-                do {
-                    stream.skipBytes(size);
-                    lastOffset = stream.readLong();
-                    if (firstOffset == -1)
-                        firstOffset = lastOffset;
-                    // read record size
-                    size = stream.readInt();
-                } while (buffer.position() + size < buffer.limit());
-
-                return batchLogEntry = new BatchLogEntry(buffer, firstOffset, lastOffset);
+        static ThreadLocal<byte[]> bytes = new ThreadLocal<byte[]> () {
+            @Override
+            protected byte[] initialValue()
+            {
+                return new byte[500 * 1024 * 1024];
             }
-            else
-              return null;
-          } else {
-              // read the offset
-              long offset = stream.readLong();
-              // read record size
-              int size = stream.readInt();
-              if (size < 0)
-                  throw new IllegalStateException("Record with size " + size);
-              // read the record, if compression is used we cannot depend on size
-              // and hence has to do extra copy
-              ByteBuffer rec;
-              if (type == CompressionType.NONE) {
-                  rec = buffer.slice();
-                  int newPos = buffer.position() + size;
-                  if (newPos > buffer.limit())
-                      return null;
-                  buffer.position(newPos);
-                  rec.limit(size);
-              } else {
-                  byte[] recordBuffer = new byte[size];
-                  stream.readFully(recordBuffer, 0, size);
-                  rec = ByteBuffer.wrap(recordBuffer);
-              }
-              return new LogEntry(offset, new Record(rec));
-          }
+        };
+        private long constructLong(byte[] readBuffer, int i) {
+            return (((long)readBuffer[i + 0] << 56) +
+                    ((long)(readBuffer[i + 1] & 255) << 48) +
+                    ((long)(readBuffer[i + 2] & 255) << 40) +
+                    ((long)(readBuffer[i + 3] & 255) << 32) +
+                    ((long)(readBuffer[i + 4] & 255) << 24) +
+                    ((readBuffer[i +5] & 255) << 16) +
+                    ((readBuffer[i + 6] & 255) <<  8) +
+                    ((readBuffer[i + 7] & 255) <<  0));
+        }
+
+        private LogEntry getNextEntryFromStream() throws IOException {
+            if (batch) {
+                if (batchLogEntry == null) {
+                    int size;
+                    long lastOffset;
+                    long firstOffset;
+                    firstOffset = stream.readLong();
+                    lastOffset = firstOffset;
+                    size = stream.readInt();
+                    if (buffer.position() + size < buffer.limit()) {
+                        int previousSize;
+                        do {
+                            previousSize = size;
+                            stream.read(bytes.get(), 0, size +8);
+                            size = stream.readInt();
+                        } while (buffer.position() + size < buffer.limit());
+                        lastOffset = constructLong(bytes.get(), previousSize);
+                    }
+
+                    return batchLogEntry = new BatchLogEntry(buffer, firstOffset, lastOffset);
+                } else {
+                    return null;
+                }
+            } else {
+                // read the offset
+                long offset = stream.readLong();
+                // read record size
+                int size = stream.readInt();
+                if (size < 0)
+                    throw new IllegalStateException("Record with size " + size);
+                // read the record, if compression is used we cannot depend on size
+                // and hence has to do extra copy
+                ByteBuffer rec;
+                if (type == CompressionType.NONE) {
+                    rec = buffer.slice();
+                    int newPos = buffer.position() + size;
+                    if (newPos > buffer.limit())
+                        return null;
+                    buffer.position(newPos);
+                    rec.limit(size);
+                } else {
+                    byte[] recordBuffer = new byte[size];
+                    stream.readFully(recordBuffer, 0, size);
+                    rec = ByteBuffer.wrap(recordBuffer);
+                }
+                return new LogEntry(offset, new Record(rec));
+            }
         }
 
         private boolean innerDone() {

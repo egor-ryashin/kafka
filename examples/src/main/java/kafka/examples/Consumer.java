@@ -29,22 +29,21 @@ public class Consumer extends ShutdownableThread
 {
   private final KafkaConsumer<Integer, byte[]> consumer;
   private final String topic;
-  private final int size;
+  private final long count;
 
-  public Consumer(String topic, int size)
+  public Consumer(String topic, int size, int count, int minbytes, int port)
   {
     super("KafkaConsumerExample", false);
-    this.size = size;
+    this.count = count;
     Properties props = new Properties();
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-    props.put(ConsumerConfig.GROUP_ID_CONFIG, "DemoConsumer");
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + port);
+    props.put(ConsumerConfig.GROUP_ID_CONFIG, "DemoConsumer" + System.currentTimeMillis());
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-//        props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
     props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, Integer.toString(Integer.MAX_VALUE));
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, Integer.toString(Integer.MAX_VALUE));
     props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, Integer.toString(Integer.MAX_VALUE-1));
-    props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 2_000_000_000l + "");
+    props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, minbytes + "");
     props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "30000");
     props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, Integer.MAX_VALUE +  "");
 
@@ -64,7 +63,7 @@ public class Consumer extends ShutdownableThread
   long timeSum = 0;
   int calCount = 0;
   int step = 0;
-  int recordsTotal = 0;
+  long recordsTotal = 0;
   long firstOffset = -1;
 
   @Override
@@ -73,9 +72,6 @@ public class Consumer extends ShutdownableThread
     consumer.subscribe(Collections.singletonList(this.topic));
     long l = System.currentTimeMillis();
     ConsumerRecords<Integer, byte[]> records = consumer.poll(Integer.MAX_VALUE);
-//        for (ConsumerRecord<Integer, byte[]> record : records) {
-//            System.out.println("Received message: (" + record.key() + ", " + record.value() + ") at offset " + record.offset());
-//        }
     ConsumerRecord<Integer, byte[]> next = null;
     if (records.iterator().hasNext()) {
       next = records.iterator().next();
@@ -91,33 +87,29 @@ public class Consumer extends ShutdownableThread
       step++;
     }
     boolean batch = Boolean.getBoolean("batch");
-    int count = records.count();
+    long count = records.count();
     recordsTotal += count;
-    System.out.print("topic " + topic + " batch " + batch
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append("topic " + topic + " batch " + batch
                      + " time " + time + " rs " + count //+ " total " + sum
     );
     if (batch) {
-      System.out.print(" lo " + records.lastOffset());
-//      if (next != null)
-//        System.out.print(" sz " + next.value().length / count);
+      stringBuilder.append(" lo " + records.lastOffset());
     } else {
       if (next != null)
-      System.out.print(" sz " + next.value().length);
+      stringBuilder.append(" sz " + next.value().length);
     }
     if (calCount > 2) {
-      System.out.print(" total (ms) " + timeSum);
-      System.out.print(" avg (ms) " + timeSum / step);
+      stringBuilder.append(" total (ms) " + timeSum);
+      stringBuilder.append(" avg (ms) " + timeSum / step);
     }
-    System.out.println();
+    System.out.println(stringBuilder);
 
     calCount++;
-//    if (recordsTotal * 0.9 >= 5000_000_000l/size) {
-//      initiateShutdown();
-//    }
-    status++;
+    if (recordsTotal >= this.count) {
+      initiateShutdown();
+    }
   }
-
-  public int status = 0;
 
   @Override
   public String name()
