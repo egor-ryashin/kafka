@@ -55,6 +55,9 @@ import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -517,6 +520,7 @@ public class Fetcher<K, V> {
         return requests;
     }
 
+    private static Boolean dump  = Boolean.getBoolean("dump");
     /**
      * The callback for fetch completion
      */
@@ -544,6 +548,18 @@ public class Fetcher<K, V> {
                 }
 
                 ByteBuffer buffer = partition.recordSet;
+                if (dump) {
+                    synchronized (this.getClass()) {
+                        FileOutputStream fileOutputStream = null;
+                        try {
+                            fileOutputStream = new FileOutputStream(new File("batch" + System.currentTimeMillis()) + ".dat");
+                            fileOutputStream.write(buffer.array(), buffer.position() + buffer.arrayOffset(), buffer.limit());
+                            fileOutputStream.close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
                 MemoryRecords records = MemoryRecords.readableRecords(buffer);
                 List<ConsumerRecord<K, V>> parsed = new ArrayList<>();
                 boolean skippedRecords = false;
@@ -626,20 +642,21 @@ public class Fetcher<K, V> {
                 long offset = logEntry.offset();
                 long timestamp = record.timestamp();
                 ByteBuffer buffer = ((MemoryRecords.RecordsIterator.BatchLogEntry) logEntry).getBuffer();
-                ConsumerRecord<K, V> kvConsumerRecord = new ConsumerRecord<>(partition.topic(),
+                ConsumerRecord<K, V> consumerRecord = new ConsumerRecord<>(partition.topic(),
                                                                              partition.partition(),
                                                                              offset,
                                                                              timestamp,
-                                                                             null,
+                                                                             null, // todo timestamp type
                                                                              record.checksum(),
                                                                              -1,
                                                                              -1,
                                                                              null,
                                                                             null
                 );
+                consumerRecord.setByteBuffer(buffer);
                 MemoryRecords.RecordsIterator.BatchLogEntry logEntry1 = (MemoryRecords.RecordsIterator.BatchLogEntry) logEntry;
-                kvConsumerRecord.setLastOffset(logEntry1.lastOffset());
-                return kvConsumerRecord;
+                consumerRecord.setLastOffset(logEntry1.lastOffset());
+                return consumerRecord;
             } else {
                 long offset = logEntry.offset();
                 long timestamp = record.timestamp();

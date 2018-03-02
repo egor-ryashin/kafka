@@ -21,5 +21,5 @@ if [ "x$KAFKA_HEAP_OPTS" = "x" ]; then
     export KAFKA_HEAP_OPTS="-Xmx512M"
 fi
 export KAFKA_HEAP_OPTS="-Xmx5G -Xms5G"
-export KAFKA_OPTS="-Dbatch=true"
+export KAFKA_OPTS="-Dbatch=true -Ddump=true"
 exec $base_dir/bin/kafka-run-class.sh kafka.examples.KafkaConsumerProducerDemo $@

@@ -15,6 +15,8 @@ package org.apache.kafka.clients.consumer;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.TimestampType;
 
+import java.nio.ByteBuffer;
+
 /**
  * A key/value pair to be received from Kafka. This consists of a topic name and a partition number, from which the
  * record is being received and an offset that points to the record in a Kafka partition.
@@ -35,6 +37,12 @@ public final class ConsumerRecord<K, V> {
     private final K key;
     private final V value;
     private long lastOffset;
+
+    public ByteBuffer getByteBuffer() {
+        return byteBuffer;
+    }
+
+    private ByteBuffer byteBuffer;
 
     /**
      * Creates a record to be received from a specified topic and partition (provided for
@@ -184,5 +192,9 @@ public final class ConsumerRecord<K, V> {
     public long lastOffset()
     {
        return lastOffset;
+    }
+
+    public void setByteBuffer(ByteBuffer byteBuffer) {
+        this.byteBuffer = byteBuffer;
     }
 }
