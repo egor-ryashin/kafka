@@ -229,12 +229,19 @@ public class MemoryRecords implements Records {
         private final ArrayDeque<LogEntry> logEntries;
         private final long absoluteBaseOffset;
         private BatchLogEntry batchLogEntry;
+        private ByteBuffer org;
 
         public RecordsIterator(ByteBuffer buffer, boolean shallow) {
             this.type = CompressionType.NONE;
-            this.buffer = buffer;
             this.shallow = shallow;
-            this.stream = new DataInputStream(new ByteBufferInputStream(buffer));
+            if (batch) {
+                this.buffer = buffer.duplicate();
+                this.stream = new DataInputStream(new ByteBufferInputStream(this.buffer));
+                this.org = buffer;
+            } else {
+                this.stream = new DataInputStream(new ByteBufferInputStream(buffer));
+                this.buffer = buffer;
+            }
             this.logEntries = null;
             this.absoluteBaseOffset = -1;
         }
@@ -390,7 +397,7 @@ public class MemoryRecords implements Records {
                         lastOffset = constructLong(bytes.get(), previousSize);
                     }
 
-                    return batchLogEntry = new BatchLogEntry(buffer, firstOffset, lastOffset);
+                    return batchLogEntry = new BatchLogEntry(org, firstOffset, lastOffset);
                 } else {
                     return null;
                 }

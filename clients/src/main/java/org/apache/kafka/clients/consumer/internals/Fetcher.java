@@ -39,10 +39,7 @@ import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Rate;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
-import org.apache.kafka.common.record.LogEntry;
-import org.apache.kafka.common.record.MemoryRecords;
-import org.apache.kafka.common.record.Record;
-import org.apache.kafka.common.record.TimestampType;
+import org.apache.kafka.common.record.*;
 import org.apache.kafka.common.requests.FetchRequest;
 import org.apache.kafka.common.requests.FetchResponse;
 import org.apache.kafka.common.requests.ListOffsetRequest;
@@ -55,8 +52,7 @@ import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.DataInputStream;
 import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -550,14 +546,7 @@ public class Fetcher<K, V> {
                 ByteBuffer buffer = partition.recordSet;
                 if (dump) {
                     synchronized (this.getClass()) {
-                        FileOutputStream fileOutputStream = null;
-                        try {
-                            fileOutputStream = new FileOutputStream(new File("batch" + System.currentTimeMillis()) + ".dat");
-                            fileOutputStream.write(buffer.array(), buffer.position() + buffer.arrayOffset(), buffer.limit());
-                            fileOutputStream.close();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                        dumpBuffer("kafkaclient" + System.currentTimeMillis() + ".dat", buffer.duplicate());
                     }
                 }
                 MemoryRecords records = MemoryRecords.readableRecords(buffer);
@@ -621,6 +610,35 @@ public class Fetcher<K, V> {
         }
 
         return parsedRecords;
+    }
+
+    public static void dumpBuffer(String filename, ByteBuffer buffer) {
+        // read the offset
+        DataInputStream stream = new DataInputStream(new ByteBufferInputStream(buffer));
+        try (FileOutputStream file = new FileOutputStream(filename)){
+            while (buffer.position() < buffer.limit()) {
+                long offset = stream.readLong();
+                // read record size
+                int size = stream.readInt();
+                if (size < 0)
+                    throw new IllegalStateException("Record with size " + size);
+                // read the record, if compression is used we cannot depend on size
+                // and hence has to do extra copy
+                ByteBuffer rec;
+
+                byte[] recordBuffer = new byte[size];
+                stream.readFully(recordBuffer, 0, size);
+                rec = ByteBuffer.wrap(recordBuffer);
+                Record record = new Record(rec);
+                new LogEntry(offset, record);
+                String s = offset + " ";
+                file.write(s.getBytes());
+                file.write(Utils.toArray(record.value()));
+                file.write("\n".getBytes());
+            }
+        } catch (Exception e) {
+           e.printStackTrace();
+        }
     }
 
     private static boolean batch = Boolean.getBoolean("batch");
