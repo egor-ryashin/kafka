@@ -339,6 +339,7 @@ public class Fetcher<K, V> {
         if (this.subscriptions.partitionAssignmentNeeded()) {
             return Collections.emptyMap();
         } else {
+
             Map<TopicPartition, List<ConsumerRecord<K, V>>> drained = new HashMap<>();
             int recordsRemaining = maxPollRecords;
             Iterator<CompletedFetch> completedFetchesIterator = completedFetches.iterator();
@@ -613,6 +614,13 @@ public class Fetcher<K, V> {
     }
 
     public static void dumpBuffer(String filename, ByteBuffer buffer) {
+        try (FileOutputStream fileOutputStream = new FileOutputStream("binary-kafka-" + System.currentTimeMillis() + ".dat")) {
+            ByteBuffer duplicate = buffer.duplicate();
+            fileOutputStream.write(duplicate.array(), duplicate.arrayOffset(), duplicate.limit() - duplicate.position());
+            fileOutputStream.close();
+        } catch (Exception e) {
+           System.out.println(e.getMessage());
+        }
         // read the offset
         DataInputStream stream = new DataInputStream(new ByteBufferInputStream(buffer));
         try (FileOutputStream file = new FileOutputStream(filename)){

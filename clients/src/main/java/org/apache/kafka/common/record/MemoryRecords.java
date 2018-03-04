@@ -14,6 +14,7 @@ package org.apache.kafka.common.record;
 
 import java.io.DataInputStream;
 import java.io.EOFException;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -387,17 +388,22 @@ public class MemoryRecords implements Records {
                     firstOffset = stream.readLong();
                     lastOffset = firstOffset;
                     size = stream.readInt();
-                    if (buffer.position() + size < buffer.limit()) {
+                    int limit = buffer.position() + size; // todo incorrect for batch of one msg
+                    if (limit < buffer.limit()) {
                         int previousSize;
                         do {
                             previousSize = size;
-                            stream.read(bytes.get(), 0, size +8);
+                            stream.read(bytes.get(), 0, size + 8);
                             size = stream.readInt();
-                        } while (buffer.position() + size < buffer.limit());
+                        } while (buffer.position() + size + 8 + 4 < buffer.limit());
                         lastOffset = constructLong(bytes.get(), previousSize);
+                        if (buffer.position() + size == buffer.limit())
+                            limit = buffer.position() + size;
+                        else
+                            limit = buffer.position() - 4 - 8;
                     }
 
-                    return batchLogEntry = new BatchLogEntry(org, firstOffset, lastOffset);
+                    return batchLogEntry = new BatchLogEntry((ByteBuffer)org.limit(limit), firstOffset, lastOffset);
                 } else {
                     return null;
                 }
@@ -430,5 +436,15 @@ public class MemoryRecords implements Records {
         private boolean innerDone() {
             return innerIter == null || !innerIter.hasNext();
         }
+    }
+
+    public static void main(String[] args) throws IOException {
+        FileInputStream fileInputStream = new FileInputStream(args[0]);
+        byte[] bytes = new byte[2 * 1024 * 1024];
+        fileInputStream.read(bytes);
+        fileInputStream.close();
+        RecordsIterator recordsIterator = new RecordsIterator(ByteBuffer.wrap(bytes), false);
+        boolean b = recordsIterator.hasNext();
+        System.out.println(b);
     }
 }
