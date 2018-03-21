@@ -361,13 +361,7 @@ public class MemoryRecords implements Records {
                 return buffer;
             }
         }
-        static ThreadLocal<byte[]> bytes = new ThreadLocal<byte[]> () {
-            @Override
-            protected byte[] initialValue()
-            {
-                return new byte[500 * 1024 * 1024];
-            }
-        };
+
         private long constructLong(byte[] readBuffer, int i) {
             return (((long)readBuffer[i + 0] << 56) +
                     ((long)(readBuffer[i + 1] & 255) << 48) +
@@ -386,21 +380,29 @@ public class MemoryRecords implements Records {
                     long lastOffset;
                     long firstOffset;
                     firstOffset = stream.readLong();
-                    lastOffset = firstOffset;
                     size = stream.readInt();
-                    int limit = buffer.position() + size; // todo incorrect for batch of one msg
+                    int limit = buffer.position() + size;
                     if (limit < buffer.limit()) {
-                        int previousSize;
-                        do {
+                        int previousSize = size;
+                        while (buffer.position() + size + 8 + 4 < buffer.limit()) {
                             previousSize = size;
-                            stream.read(bytes.get(), 0, size + 8);
+                            buffer.position(buffer.position() + size + 8);
                             size = stream.readInt();
-                        } while (buffer.position() + size + 8 + 4 < buffer.limit());
-                        lastOffset = constructLong(bytes.get(), previousSize);
-                        if (buffer.position() + size == buffer.limit())
                             limit = buffer.position() + size;
-                        else
+                            if (limit > buffer.limit()) {
+                                break;
+                            }
+                        }
+                        if (buffer.position() + size == buffer.limit()) {
+                            limit = buffer.position() + size;
+                            lastOffset = constructLong(buffer.array(), buffer.arrayOffset() + buffer.position() - 4 - 8);
+                        } else {
                             limit = buffer.position() - 4 - 8;
+                            lastOffset = constructLong(buffer.array(), buffer.arrayOffset()
+                                + buffer.position() - 4*2 - 8*2 - previousSize);
+                        }
+                    } else {
+                        return null;
                     }
 
                     return batchLogEntry = new BatchLogEntry((ByteBuffer)org.limit(limit), firstOffset, lastOffset);
