@@ -437,7 +437,7 @@ project(':core') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
     }
     into "$buildDir/dependant-libs-${versions.scala}"
     duplicatesStrategy 'exclude'
@@ -566,7 +566,7 @@ project(':examples') {
 }
 
 project(':clients') {
-  archivesBaseName = "kafka-clients"
+  archivesBaseName = "kafka-clients-batch"
 
   dependencies {
     compile libs.lz4
@@ -656,7 +656,7 @@ project(':tools') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
     }
     into "$buildDir/dependant-libs-${versions.scala}"
     duplicatesStrategy 'exclude'
@@ -703,7 +703,7 @@ project(':streams') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
     }
     into "$buildDir/dependant-libs-${versions.scala}"
     duplicatesStrategy 'exclude'
@@ -789,7 +789,7 @@ project(':connect:api') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
       exclude('connect-*')
     }
     into "$buildDir/dependant-libs"
@@ -826,7 +826,7 @@ project(':connect:json') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
       exclude('connect-*')
     }
     into "$buildDir/dependant-libs"
@@ -876,7 +876,7 @@ project(':connect:runtime') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
       exclude('connect-*')
     }
     into "$buildDir/dependant-libs"
@@ -919,7 +919,7 @@ project(':connect:file') {
       include('slf4j-log4j12*')
     }
     from (configurations.runtime) {
-      exclude('kafka-clients*')
+      exclude('kafka-clients-batch*')
       exclude('connect-*')
     }
     into "$buildDir/dependant-libs"
