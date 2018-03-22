@@ -24,42 +24,65 @@ import java.util.Date;
 import java.util.Properties;
 
 public class Producer extends Thread {
-    private final KafkaProducer<Integer, byte[]> producer;
+
     private final String topic;
     private final Boolean isAsync;
     private final int size;
     private final int count;
+    private Properties props;
+    private static Boolean stringdata = Boolean.getBoolean("stringdata");
 
     public Producer(String topic, Boolean isAsync, int size, int count, int minbytes, int port) {
         this.size = size;
         this.count = count;
-        Properties props = new Properties();
+        props = new Properties();
         props.put("bootstrap.servers", "localhost:" + port);
         props.put("client.id", "DemoProducer");
         props.put("key.serializer", "org.apache.kafka.common.serialization.IntegerSerializer");
-        props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+        if (stringdata) {
+            props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+        } else {
+            props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+        }
         props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "300000");
         props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, "300000");
         props.put("buffer.memory", minbytes + "");
         props.put("max.request.size", Integer.MAX_VALUE + "");
-        producer = new KafkaProducer<>(props);
+
+
         this.topic = topic;
         this.isAsync = isAsync;
     }
 
     public void run() {
+        Boolean stringdata = Boolean.getBoolean("stringdata");
+        if (stringdata) {
+            produce(new KafkaProducer<Integer, String>(props));
+        } else {
+            produce(new KafkaProducer<Integer, byte[]>(props));
+        }
+    }
+
+    private <T> void produce(KafkaProducer<Integer, T> producer) {
         int messageNo = 1;
         int msgCount = count;
-        byte[] bytes = new byte[size];
+        Object value ;
+        if (stringdata) {
+            value = "stringstring";
+        } else {
+            byte[] bytes = new byte[size];
 
-        for (int i = 0; i < bytes.length; i += bytes.length / 10) {
-            bytes[i] = (byte) (Math.random() * 100);
+            for (int i = 0; i < bytes.length; i += bytes.length / 10) {
+                bytes[i] = (byte) (Math.random() * 100);
+            }
+            value = bytes;
         }
+
 
         System.out.println("size " + size + " msgs " + msgCount);
         for (int i = 0; i < msgCount; i++) {
             if (isAsync) { // Send asynchronously
-                producer.send(new ProducerRecord<Integer, byte[]>(topic, bytes));
+                producer.send(new ProducerRecord<Integer, T>(topic, (T)value));
                 if (i % 10000 == 0) {
                     System.out.println(new Date() + " Sent message: (" + messageNo + ", " + i + ")");
                 }
@@ -67,7 +90,7 @@ public class Producer extends Thread {
             ++messageNo;
         }
         try {
-            System.out.println("Posted " + (bytes.length * msgCount));
+            System.out.println("Posted " + ((stringdata ? ((String)value).length() : ((byte[])value).length) * msgCount));
             Thread.sleep(15000000);
         } catch (InterruptedException e) {
             e.printStackTrace();

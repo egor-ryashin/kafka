@@ -40,7 +40,7 @@ public class Consumer extends ShutdownableThread
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "DemoConsumer" + System.currentTimeMillis());
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+    props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, Integer.getInteger("max.partition.fetch.bytes", Integer.MAX_VALUE));
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, Integer.toString(Integer.MAX_VALUE));
     props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, Integer.toString(Integer.MAX_VALUE-1));
     props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, minbytes + "");
