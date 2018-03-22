@@ -667,21 +667,19 @@ public class Fetcher<K, V> {
             if (batch ) {
                 long offset = logEntry.offset();
                 long timestamp = record.timestamp();
-                ByteBuffer buffer = ((MemoryRecords.RecordsIterator.BatchLogEntry) logEntry).getBuffer();
+                MemoryRecords.BatchLogEntry batchEntry = (MemoryRecords.BatchLogEntry) logEntry;
                 ConsumerRecord<K, V> consumerRecord = new ConsumerRecord<>(partition.topic(),
                                                                              partition.partition(),
                                                                              offset,
                                                                              timestamp,
-                                                                             null, // todo timestamp type
+                                                                             null,
                                                                              record.checksum(),
                                                                              -1,
                                                                              -1,
                                                                              null,
-                                                                            null
+                                                                             null
                 );
-                consumerRecord.setByteBuffer(buffer);
-                MemoryRecords.RecordsIterator.BatchLogEntry logEntry1 = (MemoryRecords.RecordsIterator.BatchLogEntry) logEntry;
-                consumerRecord.setLastOffset(logEntry1.lastOffset());
+                consumerRecord.setLogEntry(batchEntry);
                 return consumerRecord;
             } else {
                 long offset = logEntry.offset();

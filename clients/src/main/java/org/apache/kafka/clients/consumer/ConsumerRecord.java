@@ -12,6 +12,7 @@
  */
 package org.apache.kafka.clients.consumer;
 
+import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.TimestampType;
 
@@ -36,13 +37,7 @@ public final class ConsumerRecord<K, V> {
     private final int serializedValueSize;
     private final K key;
     private final V value;
-    private long lastOffset;
-
-    public ByteBuffer getByteBuffer() {
-        return byteBuffer;
-    }
-
-    private ByteBuffer byteBuffer;
+    private MemoryRecords.BatchLogEntry logEntry;
 
     /**
      * Creates a record to be received from a specified topic and partition (provided for
@@ -103,10 +98,10 @@ public final class ConsumerRecord<K, V> {
         this.value = value;
     }
 
-    public void setLastOffset(long offset) {
-
-        this.lastOffset = offset;
-    }
+//    public void setLastOffset(long offset) {
+//
+//        this.lastOffset = offset;
+//    }
 
     /**
      * The topic this record is received from
@@ -191,10 +186,26 @@ public final class ConsumerRecord<K, V> {
 
     public long lastOffset()
     {
-       return lastOffset;
+       return logEntry.lastOffset();
     }
 
-    public void setByteBuffer(ByteBuffer byteBuffer) {
-        this.byteBuffer = byteBuffer;
+    public void setLogEntry(MemoryRecords.BatchLogEntry logEntry) {
+        this.logEntry = logEntry;
+    }
+
+    public int[] getSizes() {
+        return logEntry.getSizes().buffer;
+    }
+
+    public int[] getOffsets() {
+        return logEntry.getOffsets().buffer;
+    }
+
+    public int getMessageCount() {
+        return logEntry.getSizes().elementsCount;
+    }
+
+    public ByteBuffer getByteBuffer() {
+        return logEntry.getBuffer();
     }
 }

@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
+import com.carrotsearch.hppc.IntArrayList;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.utils.AbstractIterator;
 
@@ -339,29 +340,6 @@ public class MemoryRecords implements Records {
 
         private static boolean batch = Boolean.getBoolean("batch");
 
-        public static class BatchLogEntry extends LogEntry {
-
-            private final ByteBuffer buffer;
-            private final long lastOffset;
-
-            public BatchLogEntry(ByteBuffer buffer, long firstOffset, long lastOffset)
-            {
-                super(firstOffset, new Record(0, null, null,CompressionType.NONE,  0, 0));
-                this.buffer = buffer;
-                this.lastOffset = lastOffset;
-            }
-
-            public long lastOffset()
-            {
-                return lastOffset;
-            }
-
-            public ByteBuffer getBuffer()
-            {
-                return buffer;
-            }
-        }
-
         private long constructLong(byte[] readBuffer, int i) {
             return (((long)readBuffer[i + 0] << 56) +
                     ((long)(readBuffer[i + 1] & 255) << 48) +
@@ -379,15 +357,19 @@ public class MemoryRecords implements Records {
                     int size;
                     long lastOffset;
                     long firstOffset;
+                    IntArrayList offsets = new IntArrayList();
+                    IntArrayList sizes = new IntArrayList();
                     firstOffset = stream.readLong();
-                    size = stream.readInt();
+                    sizes.add(size = stream.readInt());
+                    offsets.add(buffer.position());
                     int limit = buffer.position() + size;
                     if (limit < buffer.limit()) {
                         int previousSize = size;
                         while (buffer.position() + size + 8 + 4 < buffer.limit()) {
                             previousSize = size;
                             buffer.position(buffer.position() + size + 8);
-                            size = stream.readInt();
+                            sizes.add(size = stream.readInt());
+                            offsets.add(buffer.position());
                             limit = buffer.position() + size;
                             if (limit > buffer.limit()) {
                                 break;
@@ -400,12 +382,14 @@ public class MemoryRecords implements Records {
                             limit = buffer.position() - 4 - 8;
                             lastOffset = constructLong(buffer.array(), buffer.arrayOffset()
                                 + buffer.position() - 4*2 - 8*2 - previousSize);
+                            sizes.remove(sizes.size()-1);
+                            offsets.remove(offsets.size()-1);
                         }
                     } else {
                         return null;
                     }
 
-                    return batchLogEntry = new BatchLogEntry((ByteBuffer)org.limit(limit), firstOffset, lastOffset);
+                    return batchLogEntry = new BatchLogEntry((ByteBuffer)org.limit(limit), firstOffset, lastOffset, offsets, sizes);
                 } else {
                     return null;
                 }
@@ -448,5 +432,40 @@ public class MemoryRecords implements Records {
         RecordsIterator recordsIterator = new RecordsIterator(ByteBuffer.wrap(bytes), false);
         boolean b = recordsIterator.hasNext();
         System.out.println(b);
+    }
+
+    public static class BatchLogEntry extends LogEntry {
+
+        private final ByteBuffer buffer;
+        private final long lastOffset;
+        private final IntArrayList offsets;
+        private final IntArrayList sizes;
+
+        public BatchLogEntry(ByteBuffer buffer, long firstOffset, long lastOffset, IntArrayList offsets, IntArrayList sizes)
+        {
+            super(firstOffset, new Record(0, null, null,CompressionType.NONE,  0, 0));
+            this.buffer = buffer;
+            this.lastOffset = lastOffset;
+            this.offsets = offsets;
+            this.sizes = sizes;
+        }
+
+        public long lastOffset()
+        {
+            return lastOffset;
+        }
+
+        public ByteBuffer getBuffer()
+        {
+            return buffer;
+        }
+
+        public IntArrayList getOffsets() {
+            return offsets;
+        }
+
+        public IntArrayList getSizes() {
+            return sizes;
+        }
     }
 }
