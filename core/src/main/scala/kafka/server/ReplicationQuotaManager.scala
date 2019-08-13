@@ -17,13 +17,15 @@
 package kafka.server
 
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
+import scala.collection.Seq
 
 import kafka.server.Constants._
 import kafka.server.ReplicationQuotaManagerConfig._
 import kafka.utils.CoreUtils._
 import kafka.utils.Logging
 import org.apache.kafka.common.metrics._
-import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.metrics.stats.SimpleRate
@@ -51,8 +53,9 @@ object ReplicationQuotaManagerConfig {
 }
 
 trait ReplicaQuota {
+  def record(value: Long): Unit
   def isThrottled(topicPartition: TopicPartition): Boolean
-  def isQuotaExceeded(): Boolean
+  def isQuotaExceeded: Boolean
 }
 
 object Constants {
@@ -99,7 +102,7 @@ class ReplicationQuotaManager(val config: ReplicationQuotaManagerConfig,
     *
     * @return
     */
-  override def isQuotaExceeded(): Boolean = {
+  override def isQuotaExceeded: Boolean = {
     try {
       sensor().checkQuotas()
     } catch {
